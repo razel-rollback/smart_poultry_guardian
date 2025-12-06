@@ -1,0 +1,40 @@
+# ARDUINO SERIAL COMMANDS REFERENCE
+# =================================
+
+# Commands sent FROM Python TO Arduino
+# -------------------------------------
+# F - Activate Feeder (Servo motor)
+# H - Fan HIGH (Turn ON)
+# L - Fan LOW (Turn OFF)
+# N - Light oN (LED ON)
+# M - Light off (LED OFF - using M to avoid confusion with L)
+
+# Data sent FROM Arduino TO Python
+# ---------------------------------
+# DATA:28.50,60.00  - Temperature and humidity reading
+# STATUS:Fan ON     - Status messages
+# ERROR:...         - Error messages
+
+# Example Python Usage
+# --------------------
+# arduino.write(b'F')  # Send feed command
+# arduino.write(b'H')  # Turn fan on
+# arduino.write(b'N')  # Turn light on
+
+# Example Arduino Serial Monitor Output
+# --------------------------------------
+# System Ready
+# DATA:28.50,60.00
+# DATA:28.52,60.10
+# STATUS:Feeding...
+# STATUS:Feed complete
+# STATUS:Fan ON
+# DATA:28.45,59.95
+
+# Troubleshooting
+# ---------------
+# 1. Open Arduino Serial Monitor at 9600 baud
+# 2. You should see "System Ready" on startup
+# 3. Temperature data should appear every 2 seconds
+# 4. Type 'F' in Serial Monitor to test feeder
+# 5. Type 'H' to test fan, 'L' to turn off

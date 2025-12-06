@@ -1,0 +1,93 @@
+/*
+ * ========================================
+ * ARDUINO WIRING DIAGRAM (Text Format)
+ * ========================================
+ */
+
+DHT22 TEMPERATURE SENSOR
+========================
+DHT22 VCC  (Pin 1) ──────────────── Arduino 5V
+DHT22 DATA (Pin 2) ──────────────── Arduino Digital Pin 2
+DHT22 GND  (Pin 4) ──────────────── Arduino GND
+
+
+DC FAN WITH TRANSISTOR (12V)
+============================
+                                   +12V Power Supply
+                                         │
+                                         ├──────── Fan (+)
+                                         │
+                                    [DC FAN 12V]
+                                         │
+                                         └──────── Fan (-)
+                                                       │
+                                                  Diode │ (1N4007)
+                                                  ──────┤ Cathode ↑
+                                                        │
+                                        TIP120          │
+                                      Collector ────────┤
+                                          │
+Arduino Pin 3 ────[ 1kΩ ]──── Base      │
+                                          │
+                                      Emitter
+                                          │
+                                         GND
+                                          │
+12V Power Supply GND ─────────────────────┴──────── Arduino GND
+(COMMON GROUND IS CRITICAL!)
+
+
+LED WITH PHOTORESISTOR
+======================
+                        5V
+                         │
+                         ├───── Photoresistor ───┬──── A0
+                         │                        │
+                         │                    [ 10kΩ ]
+                         │                        │
+                         │                       GND
+
+                Arduino Pin 4 ────[ 220Ω ]──── LED (+)
+                                                  │
+                                               LED (-)
+                                                  │
+                                                 GND
+
+
+SERVO MOTOR (FEEDER)
+====================
+Servo Red Wire    (VCC) ──────────── Arduino 5V
+Servo Orange Wire (PWM) ──────────── Arduino Digital Pin 9
+Servo Brown Wire  (GND) ──────────── Arduino GND
+
+
+COMPLETE POWER SETUP
+====================
+┌─────────────────────┐
+│   12V Power Supply  │
+│    (Wall Adapter)   │
+└────────┬────────────┘
+         │
+         ├─────► Fan (+12V)
+         │
+         └─────► Arduino VIN (or use separate USB power)
+
+
+PIN SUMMARY
+===========
+Arduino Pin 2  → DHT22 Data
+Arduino Pin 3  → Transistor Base (Fan Control)
+Arduino Pin 4  → LED
+Arduino Pin 9  → Servo Signal
+Arduino A0     → Photoresistor
+Arduino 5V     → DHT22, Servo, Photoresistor
+Arduino GND    → All GND connections + 12V supply GND
+
+
+IMPORTANT NOTES
+===============
+1. Always connect 12V power supply GND to Arduino GND (common ground)
+2. Diode protects Arduino from back EMF from fan motor
+3. Transistor isolates Arduino from high current fan
+4. Use heat sink on transistor if fan draws > 1A
+5. Test each component separately before full assembly
