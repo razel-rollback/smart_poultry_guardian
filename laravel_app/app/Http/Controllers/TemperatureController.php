@@ -29,6 +29,7 @@ class TemperatureController extends Controller
     {
         $validated = $request->validate([
             'threshold_temperature' => 'sometimes|numeric|min:0|max:100',
+            'threshold_humidity' => 'sometimes|numeric|min:0|max:100',
             'fan_override' => 'sometimes|boolean'
         ]);
 
@@ -48,7 +49,8 @@ class TemperatureController extends Controller
         $validated = $request->validate([
             'temperature' => 'required|numeric',
             'humidity' => 'required|numeric',
-            'light_level' => 'nullable|numeric'
+            'light_level' => 'nullable|numeric',
+            'led_state' => 'nullable|boolean'
         ]);
 
         $reading = TemperatureReading::create([
@@ -66,16 +68,18 @@ class TemperatureController extends Controller
         $validated = $request->validate([
             'temperature' => 'required|numeric',
             'humidity' => 'required|numeric',
-            'light_level' => 'nullable|numeric'
+            'light_level' => 'nullable|numeric',
+            'led_state' => 'nullable|boolean',
         ]);
 
-        // Store in cache for 10 seconds (fast access)
+        // Store in cache for 30 seconds (fast access) - longer than update interval
         cache()->put('realtime_sensor', [
-            'temperature' => $validated['temperature'],
-            'humidity' => $validated['humidity'],
+            'temperature' => (float) $validated['temperature'],
+            'humidity' => (float) $validated['humidity'],
             'light_level' => $validated['light_level'] ?? null,
-            'recorded_at' => Carbon::now()
-        ], 10);
+            'led_state' => $validated['led_state'] ?? null,
+            'recorded_at' => Carbon::now()->toISOString()
+        ], 30);
 
         return response()->json(['status' => 'ok'], 200);
     }
@@ -115,22 +119,39 @@ class TemperatureController extends Controller
         $latestReading = TemperatureReading::latest('recorded_at')->first();
 
         $fanOn = false;
+        $reason = 'normal';
 
         if ($settings) {
             // If manual override is on, fan is always on
             if ($settings->fan_override) {
                 $fanOn = true;
+                $reason = 'manual_override';
             } 
-            // Otherwise, check if temperature exceeds threshold
-            elseif ($latestReading && $latestReading->temperature > $settings->threshold_temperature) {
-                $fanOn = true;
+            // Otherwise, check if temperature OR humidity exceeds threshold
+            elseif ($latestReading) {
+                $tempExceeded = $latestReading->temperature > $settings->threshold_temperature;
+                $humidityExceeded = $latestReading->humidity > $settings->threshold_humidity;
+                
+                if ($tempExceeded && $humidityExceeded) {
+                    $fanOn = true;
+                    $reason = 'temperature_and_humidity';
+                } elseif ($tempExceeded) {
+                    $fanOn = true;
+                    $reason = 'temperature';
+                } elseif ($humidityExceeded) {
+                    $fanOn = true;
+                    $reason = 'humidity';
+                }
             }
         }
 
         return response()->json([
             'fan_status' => $fanOn ? 'ON' : 'OFF',
+            'reason' => $reason,
             'current_temperature' => $latestReading ? $latestReading->temperature : null,
-            'threshold' => $settings ? $settings->threshold_temperature : null,
+            'current_humidity' => $latestReading ? $latestReading->humidity : null,
+            'temp_threshold' => $settings ? $settings->threshold_temperature : null,
+            'humidity_threshold' => $settings ? $settings->threshold_humidity : null,
             'override' => $settings ? $settings->fan_override : false
         ]);
     }

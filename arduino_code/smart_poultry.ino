@@ -1,7 +1,6 @@
 /*
  * ========================================
  * SMART POULTRY SYSTEM - ARDUINO
- * Update: Simplified "Dark = LED ON" Logic
  * ========================================
  */
 
@@ -19,10 +18,9 @@
 
 // ========== SETTINGS ==========
 // Adjust this number to change sensitivity.
-// 0 = Pitch Black, 1023 = Direct Sunlight.
-// < 300 is usually a good "dusk/dark" starting point.
-const int DARK_THRESHOLD = 300;   // Turn ON if reading is below this
-const int BRIGHT_THRESHOLD = 400; // Turn OFF if reading is above this 
+// Your photoresistor: HIGH value (600-700) = BRIGHT, LOW value (0-300) = DARK
+const int BRIGHT_THRESHOLD = 500; // Turn OFF if reading is ABOVE this (it's bright)
+const int DARK_THRESHOLD = 400;   // Turn ON if reading is BELOW this (it's dark) 
 
 // ========== OBJECTS ==========
 DHT dht(DHTPIN, DHTTYPE);
@@ -30,7 +28,7 @@ Servo feederServo;
 
 // ========== TIMING & STATE ==========
 unsigned long lastSensorRead = 0;
-const long sensorInterval = 2000;
+const long sensorInterval = 3000; 
 
 bool fanState = false;
 bool ledState = false; 
@@ -60,26 +58,8 @@ void loop() {
   // Read the Light Level (0 to 1023)
   int lightLevel = analogRead(PHOTORESISTOR_PIN);
 
-  // ==================================================
-  // 1. AUTOMATIC NIGHT LIGHT LOGIC (UPDATED)
-  // ==================================================
-  if (!manualLightMode) {
-    // AUTOMATIC MODE: Use photoresistor
-    // If the sensor value is LOWER than threshold, it is DARK -> Turn LED ON
-    if (lightLevel < DARK_THRESHOLD) {
-      if (!ledState) {
-        digitalWrite(LED_PIN, HIGH);
-        ledState = true;
-      }
-    }
-    // Otherwise (it is bright) -> Turn LED OFF
-    else if (lightLevel > BRIGHT_THRESHOLD) {
-      if (ledState) {
-        digitalWrite(LED_PIN, LOW);
-        ledState = false;
-      }
-    }
-  }
+  // LED is controlled by Python commands (N=ON, M=OFF)
+  // Just like the fan is controlled by commands (H=ON, L=OFF)
 
   // ==================================================
   // 2. SEND SENSOR DATA (Temp, Humidity, Light)
@@ -93,13 +73,15 @@ void loop() {
     float temperature = dht.readTemperature();
     
     if (!isnan(humidity) && !isnan(temperature)) {
-      // Format: DATA:temp,humidity,light
+      // Format: DATA:temp,humidity,light,ledState
       Serial.print("DATA:");
       Serial.print(temperature, 2);
       Serial.print(",");
       Serial.print(humidity, 2);
       Serial.print(",");
-      Serial.println(lightLevel); 
+      Serial.print(lightLevel);
+      Serial.print(",");
+      Serial.println(ledState ? 1 : 0);  // Send LED state (1 = ON, 0 = OFF)
     }
   }
   
@@ -126,25 +108,15 @@ void loop() {
         break;
         
       case 'N': 
-        // Turn light ON and switch to MANUAL mode
-        manualLightMode = true; 
         ledState = true; 
         digitalWrite(LED_PIN, HIGH); 
-        Serial.println("STATUS:Light Manual ON"); 
+        Serial.println("STATUS:LED ON"); 
         break;
         
       case 'M': 
-        // Turn light OFF and RETURN to AUTO mode
-        manualLightMode = false; 
         ledState = false; 
         digitalWrite(LED_PIN, LOW); 
-        Serial.println("STATUS:Light Manual OFF -> Auto Mode"); 
-        break;
-        
-      case 'A': 
-        // Reset to automatic mode
-        manualLightMode = false; 
-        Serial.println("STATUS:Auto Light Mode"); 
+        Serial.println("STATUS:LED OFF"); 
         break;
     }
   }

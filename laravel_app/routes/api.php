@@ -42,6 +42,7 @@ Route::get('/temperature/history', [TemperatureController::class, 'getHistory'])
 Route::get('/temperature/fan-status', [TemperatureController::class, 'getFanStatus']);
 
 // ========== LIGHT ROUTES ==========
-Route::get('/light/status', [LightController::class, 'getStatus']);
+Route::get('/light/status', [LightController::class, 'getStatus']); // For website
 Route::post('/light/toggle', [LightController::class, 'toggle']);
 Route::put('/light/status', [LightController::class, 'setStatus']);
+Route::get('/light/led-status', [LightController::class, 'getLightStatus']); // For Python bridge (like fan)

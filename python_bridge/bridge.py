@@ -21,6 +21,7 @@ URL_FAN_STATUS = f"{API_BASE}/temperature/fan-status"
 
 # Light endpoints
 URL_LIGHT_STATUS = f"{API_BASE}/light/status"
+URL_LED_STATUS = f"{API_BASE}/light/led-status"  # Get calculated LED status (like fan)
 
 # Track fed times to avoid duplicate feeds
 fed_times = set()
@@ -29,7 +30,7 @@ fed_times = set()
 processed_commands = set()
 
 last_sensor_log = datetime.datetime.now()
-SENSOR_LOG_INTERVAL = 2000  
+SENSOR_LOG_INTERVAL = 120  # Log sensor data every 2 minutes  
 
 # Track last fan and light states to avoid redundant commands
 last_fan_state = None
@@ -82,16 +83,18 @@ while True:
             line = arduino.readline().decode('utf-8').strip()
             
             if line.startswith("DATA:"):
-                # Parse "DATA:28.50,60.00,350"
+                # Parse "DATA:28.50,60.00,350,1" (temp, humidity, light_level, led_state)
                 parts = line.replace("DATA:", "").split(",")
                 
-                # Check for 3 parts now (Temp, Hum, Light)
-                if len(parts) == 3:
+                # Check for 4 parts now (Temp, Hum, Light, LED State)
+                if len(parts) >= 3:
                     temp = float(parts[0])
                     hum = float(parts[1])
                     light_val = int(parts[2])
+                    led_state = int(parts[3]) if len(parts) >= 4 else None
                     
-                    print(f"🌡  Sensor: {temp}°C | {hum}% | ☀️ Light: {light_val}")
+                    led_status = "ON" if led_state == 1 else "OFF" if led_state == 0 else "?"
+                    print(f"🌡  Sensor: {temp}°C | {hum}% | ☀️ Light: {light_val} | 💡 LED: {led_status}")
                     
                     # Send real-time data immediately (for live display)
                     try:
@@ -100,7 +103,8 @@ while True:
                             json={
                                 'temperature': temp,
                                 'humidity': hum,
-                                'light_level': light_val
+                                'light_level': light_val,
+                                'led_state': led_state == 1 if led_state is not None else None
                             },
                             timeout=1
                         )
@@ -115,8 +119,7 @@ while True:
                         try:
                             payload = {
                                 'temperature': temp, 
-                                'humidity': hum,
-                                'light_level': light_val 
+                                'humidity': hum
                             }
                             
                             response = requests.post(
@@ -200,13 +203,13 @@ while True:
                 set_fan(fan_status)
                 last_fan_state = fan_status
 
-            # 3. Check Light Status (only send command if state changed)
-            light_response = requests.get(URL_LIGHT_STATUS, timeout=2).json()
-            light_on = light_response.get('is_on', False)
+            # 3. Check LED Status (SAME LOGIC AS FAN)
+            led_response = requests.get(URL_LED_STATUS, timeout=2).json()
+            led_status = led_response.get('led_status', 'OFF')
             
-            if light_on != last_light_state:
-                set_light(light_on)
-                last_light_state = light_on
+            if led_status != last_light_state:
+                set_light(led_status == 'ON')
+                last_light_state = led_status
 
         except requests.exceptions.RequestException as e:
             print(f"⚠️  API Connection Error: {e}")

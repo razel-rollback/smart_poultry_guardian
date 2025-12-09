@@ -359,30 +359,19 @@
                             <p class="text-gray-500 text-sm mt-1">Temperature & humidity management</p>
                         </div>
                     </div>
-
-                    <!-- Live Sensor Reading -->
-                    <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-6 mb-8 border border-red-200">
-                        <div class="flex items-center gap-2 mb-4">
-                            <span class="inline-block w-2.5 h-2.5 bg-red-500 rounded-full pulse-animation"></span>
-                            <h3 class="text-xs font-bold text-red-700 uppercase tracking-wider">Live Sensor Reading</h3>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="bg-white rounded-xl p-4">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <i class="fas fa-temperature-high text-red-500"></i>
-                                    <span class="text-xs text-gray-600 font-medium">Temperature</span>
-                                </div>
-                                <p class="text-2xl font-bold text-red-600" id="liveTemp">--°C</p>
+                     <!-- Fan Manual Override -->
+                    <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-5 border-2 border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-bold text-gray-800 mb-1">Fan Manual Override</h3>
+                                <p class="text-sm text-gray-600">Force fan ON regardless of temperature</p>
                             </div>
-                            <div class="bg-white rounded-xl p-4">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <i class="fas fa-tint text-red-500"></i>
-                                    <span class="text-xs text-gray-600 font-medium">Humidity</span>
-                                </div>
-                                <p class="text-2xl font-bold text-red-600" id="liveHumidity">--%</p>
-                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="fanOverride" onchange="toggleFanOverride()">
+                                <span class="toggle-slider"></span>
+                            </label>
                         </div>
-                        <p class="text-xs text-gray-500 mt-3" id="liveUpdateTime">Waiting for data...</p>
+                        <div id="fanStatus" class="mt-4 text-sm font-bold"></div>
                     </div>
 
                     <!-- Temperature Threshold -->
@@ -421,20 +410,6 @@
                         <p class="text-xs text-gray-500 mt-2">💧 Alert when humidity exceeds this value</p>
                     </div>
 
-                    <!-- Fan Manual Override -->
-                    <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-5 border-2 border-gray-200">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="font-bold text-gray-800 mb-1">Fan Manual Override</h3>
-                                <p class="text-sm text-gray-600">Force fan ON regardless of temperature</p>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="fanOverride" onchange="toggleFanOverride()">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                        <div id="fanStatus" class="mt-4 text-sm font-bold"></div>
-                    </div>
                 </div>
 
                 <!-- Light Control Card -->
@@ -822,15 +797,10 @@
                     document.getElementById('tempDisplay').textContent = reading.temperature.toFixed(1) + '°C';
                     document.getElementById('humidityDisplay').textContent = reading.humidity.toFixed(1) + '%';
                     
-                    // Update live reading section
-                    document.getElementById('liveTemp').textContent = reading.temperature.toFixed(1) + '°C';
-                    document.getElementById('liveHumidity').textContent = reading.humidity.toFixed(1) + '%';
-                    document.getElementById('liveUpdateTime').textContent = '🕐 Updated: ' + new Date(reading.recorded_at).toLocaleTimeString();
-                    
                     document.getElementById('lastUpdate').textContent = new Date(reading.recorded_at).toLocaleTimeString();
                     
                     // Update charts
-                    updateChartData(reading.temperature, reading.humidity);
+                    // updateChartData(reading.temperature, reading.humidity);
                 }
 
                 const thresholdInput = document.getElementById('thresholdInput');
@@ -840,7 +810,7 @@
 
                 const humidityThresholdInput = document.getElementById('humidityThresholdInput');
                 if (!isUpdatingHumidityThreshold && document.activeElement !== humidityThresholdInput) {
-                    humidityThresholdInput.value = settings.humidity_threshold || 70;
+                    humidityThresholdInput.value = settings.humidity_threshold;
                 }
                 
                 document.getElementById('fanOverride').checked = settings.fan_override;
@@ -896,6 +866,7 @@
                 }
                 
                 updateFanStatus();
+                updateLedStatus(); // Update LED status (same pattern as fan)
             } catch (error) {
                 console.error('Error loading temperature data:', error);
             }
@@ -933,7 +904,7 @@
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': CSRF_TOKEN
                     },
-                    body: JSON.stringify({ humidity_threshold: parseFloat(humidityThreshold) })
+                    body: JSON.stringify({ threshold_humidity: parseFloat(humidityThreshold) })
                 });
                 
                 if (response.ok) {
@@ -992,35 +963,33 @@
         // ========== LIGHT FUNCTIONS ==========
         async function loadLightStatus() {
             try {
+                // Get database status for control button only
                 const response = await fetch(`${API_BASE}/light/status`);
                 const data = await response.json();
                 
-                // Check if darkness is detected and light is off
-                if (data.darkness_detected && !data.is_on && 
-                    (lastCheckedValues.lightStatus === null || !lastCheckedValues.lightStatus.darkness_detected)) {
-                    
-                    addNotification('light', 
-                        '🌙 Darkness detected! Turn on the light or it will auto-activate in 1 minute.',
-                        'light',
-                        'lightButton'
-                    );
-                    
-                    // Schedule auto light activation
-                    scheduleAutoAction('light', async () => {
-                        const currentStatus = await fetch(`${API_BASE}/light/status`);
-                        const currentData = await currentStatus.json();
-                        
-                        if (currentData.darkness_detected && !currentData.is_on) {
-                            await toggleLight();
-                            addNotification('light', '💡 Light automatically activated due to darkness!', null, 'lightButton');
-                        }
-                    }, 60000);
-                }
-                
                 lastCheckedValues.lightStatus = data;
+                // Only update the control button, not the status card
                 updateLightUI(data.is_on);
             } catch (error) {
                 console.error('Error loading light status:', error);
+            }
+        }
+
+        async function updateLedStatus() {
+            try {
+                // Get CALCULATED LED status from Laravel (same as fan logic)
+                const response = await fetch(`${API_BASE}/light/led-status`);
+                const data = await response.json();
+                
+                const statusDisplay = document.getElementById('lightStatusDisplay');
+                
+                if (data.led_status === 'ON') {
+                    statusDisplay.innerHTML = '<span class="text-yellow-400">💡 ON</span>';
+                } else {
+                    statusDisplay.innerHTML = '<span class="text-gray-400">🌙 OFF</span>';
+                }
+            } catch (error) {
+                console.error('Error updating LED status:', error);
             }
         }
 
@@ -1050,16 +1019,14 @@
         function updateLightUI(isOn) {
             const button = document.getElementById('lightButton');
             const status = document.getElementById('lightStatus');
-            const statusDisplay = document.getElementById('lightStatusDisplay');
+            // Note: Don't update lightStatusDisplay here - it's updated by loadTemperatureData() from Arduino sensor
             
             if (isOn) {
                 button.className = 'w-full py-16 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] text-4xl font-bold shadow-lg bg-gradient-to-br from-yellow-400 to-yellow-500 text-white';
                 status.innerHTML = '💡 LIGHT ON';
-                statusDisplay.innerHTML = '<span class="text-yellow-400">💡 On</span>';
             } else {
                 button.className = 'w-full py-16 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] text-4xl font-bold shadow-lg bg-gradient-to-br from-gray-600 to-gray-800 text-white';
                 status.innerHTML = '🌙 LIGHT OFF';
-                statusDisplay.innerHTML = '<span class="text-gray-400">🌙 Off</span>';
             }
         }
 
